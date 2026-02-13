@@ -576,4 +576,207 @@ class MagentoApiService
 
         return $results;
     }
+	
+	/**
+ * Obtener productos sin imágenes
+ */
+public function getProductsWithoutImages($page = 1, $pageSize = 100)
+{
+    try {
+        // Primero obtener todos los productos de la página
+        $allProducts = $this->getProducts($page, $pageSize);
+        
+        if (empty($allProducts['items'])) {
+            return [
+                'items' => [],
+                'total_count' => 0,
+                'page' => $page,
+                'page_size' => $pageSize,
+            ];
+        }
+        
+        // Filtrar productos sin imágenes
+        $productsWithoutImages = [];
+        foreach ($allProducts['items'] as $product) {
+            if ($this->productHasNoImages($product)) {
+                $productsWithoutImages[] = $product;
+            }
+        }
+
+        Log::info('Magento Products Analysis', [
+            'page' => $page,
+            'total_fetched' => count($allProducts['items']),
+            'without_images' => count($productsWithoutImages),
+        ]);
+
+        return [
+            'items' => $productsWithoutImages,
+            'total_count' => count($productsWithoutImages),
+            'page' => $page,
+            'page_size' => $pageSize,
+            'total_products_in_page' => count($allProducts['items']),
+        ];
+        
+    } catch (\Exception $e) {
+        Log::error('Magento API Exception - Get Products Without Images', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return [
+            'items' => [],
+            'total_count' => 0,
+            'page' => $page,
+            'page_size' => $pageSize,
+        ];
+    }
+}
+
+	/**
+	 * Verificar si un producto NO tiene imágenes
+	 */
+
+	private function productHasNoImages($product)
+	{
+		// 1. Verificar media_gallery_entries
+		if (isset($product['media_gallery_entries']) && !empty($product['media_gallery_entries'])) {
+			foreach ($product['media_gallery_entries'] as $media) {
+				// Si tiene imagen activa, tiene imágenes
+				if (($media['media_type'] ?? '') === 'image' && !($media['disabled'] ?? false)) {
+					return false; // TIENE imagen
+				}
+			}
+		}
+
+		// 2. Verificar custom_attributes para image, small_image, thumbnail
+		if (isset($product['custom_attributes'])) {
+			foreach ($product['custom_attributes'] as $attr) {
+				$code = $attr['attribute_code'] ?? '';
+				$value = $attr['value'] ?? '';
+
+				if (in_array($code, ['image', 'small_image', 'thumbnail'])) {
+					// Si tiene un valor válido (no vacío y no 'no_selection'), tiene imagen
+					if (!empty($value) && $value !== 'no_selection' && !str_starts_with($value, 'no_selection')) {
+						return false; // TIENE imagen
+					}
+				}
+			}
+		}
+
+		return true; // NO tiene imágenes
+	}
+	
+	/**
+ * Obtener productos con paginación
+ */
+public function getProducts($page = 1, $pageSize = 100)
+{
+    try {
+        $searchCriteria = [
+            'searchCriteria' => [
+                'filterGroups' => [],
+                'pageSize' => $pageSize,
+                'currentPage' => $page
+            ]
+        ];
+
+        $response = Http::withToken($this->token)
+            ->timeout(120)
+            ->get("{$this->baseUrl}/rest/V1/products", $searchCriteria);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            
+            return [
+                'items' => $data['items'] ?? [],
+                'total_count' => $data['total_count'] ?? 0,
+                'page' => $page,
+                'page_size' => $pageSize,
+            ];
+        }
+
+        Log::error('Magento API Error - Get Products', [
+            'status' => $response->status(),
+            'body' => $response->body()
+        ]);
+
+        return [
+            'items' => [],
+            'total_count' => 0,
+            'page' => $page,
+            'page_size' => $pageSize,
+        ];
+    } catch (\Exception $e) {
+        Log::error('Magento API Exception - Get Products', [
+            'message' => $e->getMessage()
+        ]);
+        
+        return [
+            'items' => [],
+            'total_count' => 0,
+            'page' => $page,
+            'page_size' => $pageSize,
+        ];
+    }
+}
+	/**
+ * Obtener producto por SKU (retorna solo el producto, no el wrapper)
+ */
+public function getProductBySku($sku)
+{
+    $result = $this->getProduct($sku);
+    
+    if ($result['success'] && $result['exists']) {
+        return $result['data'];
+    }
+    
+    return null;
+}
+	
+	
+	/**
+ * Obtener órdenes de Magento con filtros
+ */
+public function getOrders($filters = [])
+{
+    try {
+        $params = [];
+        
+        if (isset($filters['created_at_from'])) {
+            $params['searchCriteria[filterGroups][0][filters][0][field]'] = 'created_at';
+            $params['searchCriteria[filterGroups][0][filters][0][value]'] = $filters['created_at_from'];
+            $params['searchCriteria[filterGroups][0][filters][0][condition_type]'] = 'gteq';
+        }
+        
+        if (isset($filters['created_at_to'])) {
+            $params['searchCriteria[filterGroups][1][filters][0][field]'] = 'created_at';
+            $params['searchCriteria[filterGroups][1][filters][0][value]'] = $filters['created_at_to'];
+            $params['searchCriteria[filterGroups][1][filters][0][condition_type]'] = 'lteq';
+        }
+        
+        $params['searchCriteria[filterGroups][2][filters][0][field]'] = 'status';
+        $params['searchCriteria[filterGroups][2][filters][0][value]'] = 'canceled';
+        $params['searchCriteria[filterGroups][2][filters][0][condition_type]'] = 'neq';
+        
+        $params['searchCriteria[pageSize]'] = $filters['page_size'] ?? 100;
+        $params['searchCriteria[currentPage]'] = $filters['page'] ?? 1;
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'Content-Type' => 'application/json',
+        ])
+        ->timeout(120)
+        ->get($this->baseUrl . '/rest/V1/orders', $params);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        return ['items' => []];
+
+    } catch (\Exception $e) {
+        Log::error('Magento API Error - Get Orders', ['error' => $e->getMessage()]);
+        return ['items' => []];
+    }
+}
 }

@@ -1,5 +1,4 @@
 <aside class="w-64 bg-[#0244CD] text-white flex flex-col" x-data="{ openMenu: '{{ request()->segment(1) ?? 'dashboard' }}' }">
-    <!-- Logo -->
     <div class="p-6 border-b border-white/10">
         <a href="{{ route('dashboard') }}" class="flex items-center space-x-3">
             <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
@@ -12,9 +11,7 @@
         </a>
     </div>
 
-    <!-- Navigation -->
     <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-        <!-- Dashboard -->
         <a href="{{ route('dashboard') }}" 
            class="flex items-center px-4 py-3 rounded-lg transition {{ request()->routeIs('dashboard') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,7 +20,6 @@
             <span class="font-medium">Dashboard</span>
         </a>
 
-        <!-- Workflows -->
         <div x-data="{ open: openMenu === 'workflows' || openMenu === 'executions' || openMenu === 'schedule' }">
             <button @click="open = !open" 
                     class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition text-white/70 hover:bg-white/5 hover:text-white">
@@ -54,7 +50,74 @@
             </div>
         </div>
 
-        <!-- Settings -->
+        <div x-data="{ open: openMenu === 'analysis' }">
+            <button @click="open = !open" 
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition {{ request()->routeIs('analysis.*') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    <span class="font-medium">Product Analysis</span>
+                </div>
+                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <div x-show="open" x-collapse class="ml-4 mt-1 space-y-1">
+                <a href="{{ route('analysis.index') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('analysis.index') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    Dashboard
+                </a>
+                <a href="{{ route('analysis.products') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('analysis.products') || request()->routeIs('analysis.product-detail') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    Products
+                </a>
+                <a href="{{ route('analysis.create') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('analysis.create') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    New Analysis
+                </a>
+                <a href="{{ route('analysis.configuration') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('analysis.configuration') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    Configuration
+                </a>
+            </div>
+        </div>
+
+        <div x-data="{ open: openMenu === 'sales' }">
+            <button @click="open = !open" 
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition {{ request()->routeIs('sales.*') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    <span class="font-medium">Sales Analysis</span>
+                </div>
+                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <div x-show="open" x-collapse class="ml-4 mt-1 space-y-1">
+                <a href="{{ route('sales.executive-dashboard') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('sales.executive-dashboard') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    Executive View
+                </a>
+                <a href="{{ route('sales.dashboard') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('sales.dashboard') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    Technical Stats
+                </a>
+                <a href="{{ route('sales.by-store') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('sales.by-store') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    By Store
+                </a>
+                <a href="{{ route('sales.top-products') }}" 
+                   class="flex items-center px-4 py-2 rounded-lg text-sm transition {{ request()->routeIs('sales.top-products') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
+                    Top Products
+                </a>
+            </div>
+        </div>
+
         <div x-data="{ open: openMenu === 'configuration' || openMenu === 'categories' }">
             <button @click="open = !open" 
                     class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition text-white/70 hover:bg-white/5 hover:text-white">
@@ -82,16 +145,14 @@
             </div>
         </div>
 
-        <!-- Support -->
-        <a href="#" 
-           class="flex items-center px-4 py-3 rounded-lg transition text-white/70 hover:bg-white/5 hover:text-white">
+        <a href="{{ route('profile.edit') }}" 
+           class="flex items-center px-4 py-3 rounded-lg transition {{ request()->routeIs('profile.*') ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white' }}">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
             </svg>
-            <span class="font-medium">Support</span>
+            <span class="font-medium">My Profile</span>
         </a>
 
-        <!-- User Guide -->
         <a href="#" 
            class="flex items-center px-4 py-3 rounded-lg transition text-white/70 hover:bg-white/5 hover:text-white">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,7 +162,6 @@
         </a>
     </nav>
 
-    <!-- Footer -->
     <div class="p-4 border-t border-white/10">
         <p class="text-xs text-white/50 text-center">Powered by 360</p>
     </div>
