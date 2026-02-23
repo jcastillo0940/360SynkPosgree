@@ -155,7 +155,7 @@ class SalesAnalysisController extends Controller
     public function byStore(Request $request)
     {
         $periodId = $request->get('period_id');
-        
+
         $query = DB::table('sales_by_store')
             ->select('*')
             ->orderBy('total_revenue', 'desc');
@@ -180,7 +180,7 @@ class SalesAnalysisController extends Controller
     public function byPaymentMethod(Request $request)
     {
         $periodId = $request->get('period_id');
-        
+
         $query = DB::table('sales_by_payment_method')
             ->select('*')
             ->orderBy('total_revenue', 'desc');
@@ -206,7 +206,7 @@ class SalesAnalysisController extends Controller
     {
         $periodId = $request->get('period_id');
         $country = $request->get('country');
-        
+
         $query = DB::table('sales_by_location')
             ->select('*')
             ->orderBy('total_revenue', 'desc');
@@ -239,69 +239,76 @@ class SalesAnalysisController extends Controller
     /**
      * Top productos
      */
-   
-		
-	public function topProducts(Request $request)
-{
-    // 1. Parámetros de filtrado y orden
-    $viewType = $request->get('view_type', 'period');
-    $selectedYear = $request->get('year');
-    $selectedMonth = $request->get('month');
-    $limit = $request->get('limit', 50);
-    $sortBy = $request->get('sort_by', 'total_revenue');
-    $sortOrder = $request->get('sort_order', 'desc');
 
-    // 2. Consulta con Agrupación Cronológica
-    // Usamos selectRaw para que en vistas anuales/totales se sumen los valores
-    $query = DB::table('top_products')
-        ->join('sales_analysis_periods', 'top_products.period_id', '=', 'sales_analysis_periods.id')
-        ->select('top_products.sku', 'top_products.product_name')
-        ->selectRaw('SUM(top_products.quantity_sold) as quantity_sold')
-        ->selectRaw('SUM(top_products.total_revenue) as total_revenue')
-        ->selectRaw('SUM(top_products.times_ordered) as times_ordered')
-        ->selectRaw('AVG(top_products.average_price) as average_price')
-        ->whereNull('sales_analysis_periods.deleted_at')
-        ->groupBy('top_products.sku', 'top_products.product_name');
 
-    // 3. Aplicación de Filtros según la pestaña seleccionada
-    if ($viewType === 'period') {
-        // Filtro estricto por Año y Mes
-        if ($selectedYear) {
+    public function topProducts(Request $request)
+    {
+        // 1. Parámetros de filtrado y orden
+        $viewType = $request->get('view_type', 'period');
+        $selectedYear = $request->get('year');
+        $selectedMonth = $request->get('month');
+        $limit = $request->get('limit', 50);
+        $sortBy = $request->get('sort_by', 'total_revenue');
+        $sortOrder = $request->get('sort_order', 'desc');
+
+        // 2. Consulta con Agrupación Cronológica
+        // Usamos selectRaw para que en vistas anuales/totales se sumen los valores
+        $query = DB::table('top_products')
+            ->join('sales_analysis_periods', 'top_products.period_id', '=', 'sales_analysis_periods.id')
+            ->select('top_products.sku', 'top_products.product_name')
+            ->selectRaw('SUM(top_products.quantity_sold) as quantity_sold')
+            ->selectRaw('SUM(top_products.total_revenue) as total_revenue')
+            ->selectRaw('SUM(top_products.times_ordered) as times_ordered')
+            ->selectRaw('AVG(top_products.average_price) as average_price')
+            ->whereNull('sales_analysis_periods.deleted_at')
+            ->groupBy('top_products.sku', 'top_products.product_name');
+
+        // 3. Aplicación de Filtros según la pestaña seleccionada
+        if ($viewType === 'period') {
+            // Filtro estricto por Año y Mes
+            if ($selectedYear) {
+                $query->whereYear('sales_analysis_periods.period_start', $selectedYear);
+            }
+            if ($selectedMonth) {
+                $query->whereMonth('sales_analysis_periods.period_start', $selectedMonth);
+            }
+        } elseif ($viewType === 'year' && $selectedYear) {
+            // Suma de todos los meses del año seleccionado
             $query->whereYear('sales_analysis_periods.period_start', $selectedYear);
         }
-        if ($selectedMonth) {
-            $query->whereMonth('sales_analysis_periods.period_start', $selectedMonth);
+        // Si es 'total', no filtramos por fecha para sumar todo el histórico
+
+        $products = $query->orderBy($sortBy, $sortOrder)
+            ->limit($limit)
+            ->get();
+
+        // 4. Datos para los selectores de la interfaz
+        $years = SalesAnalysisPeriod::selectRaw(DB::getDriverName() === 'pgsql' ? 'EXTRACT(YEAR FROM period_start) as year' : 'YEAR(period_start) as year')
+            ->distinct()->orderBy('year', 'desc')->pluck('year');
+
+        $months = [];
+        if ($selectedYear) {
+            $months = SalesAnalysisPeriod::whereYear('period_start', $selectedYear)
+                ->selectRaw(DB::getDriverName() === 'pgsql' ? 'EXTRACT(MONTH FROM period_start) as month_num' : 'MONTH(period_start) as month_num')
+                ->distinct()->orderBy('month_num', 'asc')->get()
+                ->map(fn($item) => [
+                    'num' => $item->month_num,
+                    'name' => \Carbon\Carbon::create()->month($item->month_num)->translatedFormat('F')
+                ]);
         }
-    } elseif ($viewType === 'year' && $selectedYear) {
-        // Suma de todos los meses del año seleccionado
-        $query->whereYear('sales_analysis_periods.period_start', $selectedYear);
-    } 
-    // Si es 'total', no filtramos por fecha para sumar todo el histórico
 
-    $products = $query->orderBy($sortBy, $sortOrder)
-        ->limit($limit)
-        ->get();
-
-    // 4. Datos para los selectores de la interfaz
-    $years = SalesAnalysisPeriod::selectRaw('YEAR(period_start) as year')
-        ->distinct()->orderBy('year', 'desc')->pluck('year');
-
-    $months = [];
-    if ($selectedYear) {
-        $months = SalesAnalysisPeriod::whereYear('period_start', $selectedYear)
-            ->selectRaw('MONTH(period_start) as month_num')
-            ->distinct()->orderBy('month_num', 'asc')->get()
-            ->map(fn($item) => [
-                'num' => $item->month_num,
-                'name' => \Carbon\Carbon::create()->month($item->month_num)->translatedFormat('F')
-            ]);
+        return view('sales.top-products', compact(
+            'products',
+            'years',
+            'months',
+            'selectedYear',
+            'selectedMonth',
+            'limit',
+            'viewType',
+            'sortBy',
+            'sortOrder'
+        ));
     }
-
-    return view('sales.top-products', compact(
-        'products', 'years', 'months', 'selectedYear', 'selectedMonth', 
-        'limit', 'viewType', 'sortBy', 'sortOrder'
-    ));
-}
 
 
     /**
@@ -310,7 +317,7 @@ class SalesAnalysisController extends Controller
     public function cohorts(Request $request)
     {
         $periodId = $request->get('period_id');
-        
+
         $query = DB::table('customer_cohorts')
             ->select('*')
             ->orderBy('cohort_month', 'desc');
@@ -374,9 +381,9 @@ class SalesAnalysisController extends Controller
         }
 
         $file = fopen($filepath, 'w');
-        
+
         // BOM para UTF-8
-        fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+        fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
         // KPIs Generales
         fputcsv($file, ['=== KPIs GENERALES ===']);
@@ -468,7 +475,7 @@ class SalesAnalysisController extends Controller
 
         switch ($chartType) {
             case 'revenue_by_store':
-                $data = $period->salesByStore->map(function($store) {
+                $data = $period->salesByStore->map(function ($store) {
                     return [
                         'label' => $store->store_name,
                         'value' => (float) $store->total_revenue,
@@ -477,7 +484,7 @@ class SalesAnalysisController extends Controller
                 break;
 
             case 'orders_by_payment':
-                $data = $period->salesByPaymentMethod->map(function($payment) {
+                $data = $period->salesByPaymentMethod->map(function ($payment) {
                     return [
                         'label' => $payment->payment_method_title,
                         'value' => $payment->total_orders,
@@ -486,7 +493,7 @@ class SalesAnalysisController extends Controller
                 break;
 
             case 'top_products':
-                $data = $period->topProducts->take(10)->map(function($product) {
+                $data = $period->topProducts->take(10)->map(function ($product) {
                     return [
                         'label' => substr($product->product_name, 0, 30),
                         'value' => (float) $product->total_revenue,

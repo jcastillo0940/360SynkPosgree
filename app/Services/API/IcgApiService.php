@@ -63,7 +63,7 @@ class IcgApiService
             }
 
             $products = $data['products'] ?? [];
-            
+
             // Mapear productos al formato del workflow
             $mappedProducts = [];
             foreach ($products as $apiProduct) {
@@ -71,14 +71,14 @@ class IcgApiService
                 if (isset($apiProduct['ArticuloId']) && $apiProduct['ArticuloId'] == -1) {
                     continue;
                 }
-                
+
                 $mappedProducts[] = $this->mapApiProductToWorkflowFormat($apiProduct);
             }
 
             // La API de ICG NO devuelve totalRegistros/totalPaginas
             // Así que asumimos que si devuelve menos productos que el límite, es la última página
             $isLastPage = count($products) < $perPage;
-            
+
             return [
                 'success' => true,
                 'data' => $mappedProducts,
@@ -122,7 +122,7 @@ class IcgApiService
             }
 
             $data = $response->json();
-            
+
             if (!isset($data['success']) || !$data['success']) {
                 return [
                     'success' => false,
@@ -166,84 +166,86 @@ class IcgApiService
      * Mapear producto de la API al formato que espera el workflow
      */
     protected function mapApiProductToWorkflowFormat($apiProduct)
-{
-    $sku = $apiProduct['Referencia'] ?? null;
-    
-    $prices = $apiProduct['Precios'] ?? [];
-    $price = 0;
-    $specialPrice = null;
-    $specialFromDate = null;
-    $specialToDate = null;
-    
-    // Buscar el precio de la tarifa 12
-    foreach ($prices as $priceData) {
-        if ($priceData['TarifaId'] == 12) {
-            $price = $priceData['Neto'] ?? 0;
-            $ofertaPrecio = $priceData['OfertaPrecio'] ?? 0;
-            
-            // ⭐ Solo procesar oferta si el precio es mayor a 0
-            if ($ofertaPrecio > 0) {
-                $ofertaDesde = $priceData['OfertaDesde'] ?? null;
-                $ofertaHasta = $priceData['OfertaHasta'] ?? null;
-                
-                // Verificar que las fechas no sean placeholder "1899-12-30"
-                if ($ofertaDesde && !str_starts_with($ofertaDesde, '1899') 
-                    && $ofertaHasta && !str_starts_with($ofertaHasta, '1899')) {
-                    
-                    try {
-                        $desde = Carbon::parse($ofertaDesde);
-                        $hasta = Carbon::parse($ofertaHasta)->endOfDay();
-                        $now = Carbon::now();
-                        
-                        // ⭐ VALIDAR: La oferta debe estar activa HOY
-                        if ($now->between($desde, $hasta)) {
-                            $specialPrice = $ofertaPrecio;
-                            $specialFromDate = $desde->format('Y-m-d H:i:s');
-                            $specialToDate = $hasta->format('Y-m-d H:i:s');
+    {
+        $sku = $apiProduct['Referencia'] ?? null;
+
+        $prices = $apiProduct['Precios'] ?? [];
+        $price = 0;
+        $specialPrice = null;
+        $specialFromDate = null;
+        $specialToDate = null;
+
+        // Buscar el precio de la tarifa 12
+        foreach ($prices as $priceData) {
+            if ($priceData['TarifaId'] == 12) {
+                $price = $priceData['Neto'] ?? 0;
+                $ofertaPrecio = $priceData['OfertaPrecio'] ?? 0;
+
+                // ⭐ Solo procesar oferta si el precio es mayor a 0
+                if ($ofertaPrecio > 0) {
+                    $ofertaDesde = $priceData['OfertaDesde'] ?? null;
+                    $ofertaHasta = $priceData['OfertaHasta'] ?? null;
+
+                    // Verificar que las fechas no sean placeholder "1899-12-30"
+                    if (
+                        $ofertaDesde && !str_starts_with($ofertaDesde, '1899')
+                        && $ofertaHasta && !str_starts_with($ofertaHasta, '1899')
+                    ) {
+
+                        try {
+                            $desde = Carbon::parse($ofertaDesde);
+                            $hasta = Carbon::parse($ofertaHasta)->endOfDay();
+                            $now = Carbon::now();
+
+                            // ⭐ VALIDAR: La oferta debe estar activa HOY
+                            if ($now->between($desde, $hasta)) {
+                                $specialPrice = $ofertaPrecio;
+                                $specialFromDate = $desde->format('Y-m-d H:i:s');
+                                $specialToDate = $hasta->format('Y-m-d H:i:s');
+                            }
+                            // Si no está activa, dejar en null (se limpiará en Magento)
+
+                        } catch (\Exception $e) {
+                            // Fecha inválida, ignorar oferta
                         }
-                        // Si no está activa, dejar en null (se limpiará en Magento)
-                        
-                    } catch (\Exception $e) {
-                        // Fecha inválida, ignorar oferta
                     }
                 }
+                break;
             }
-            break;
         }
-    }
 
-    $totalStock = 0;
-    foreach ($apiProduct['Stocks'] ?? [] as $stock) {
-        $totalStock += $stock['Disponible'] ?? 0;
-    }
+        $totalStock = 0;
+        foreach ($apiProduct['Stocks'] ?? [] as $stock) {
+            $totalStock += $stock['Disponible'] ?? 0;
+        }
 
-    $camposLibres = $apiProduct['Camposlibres'][0] ?? [];
-    
-    return [
-        'ARTCOD' => $sku,
-        'ARTDES' => $apiProduct['Descripcion'] ?? '',
-        'ARTOBSERV' => $apiProduct['Descripcion'] ?? '',
-        'PVPTARIF' => $price,
-        'PVPOFER' => $specialPrice,
-        'PVPOFER_DESDE' => $specialFromDate,
-        'PVPOFER_HASTA' => $specialToDate,
-        'EXISTEN' => $totalStock,
-        'PESO' => 0,
-        'ARTEAN' => $apiProduct['TallasColores'][0]['CodigoBarras1'] ?? '',
-        'Familia' => $apiProduct['Familia'] ?? '',
-        'Subfamilia' => $apiProduct['SubFamilia'] ?? '',
-        'WEBVISB' => $camposLibres['WEBVISB'] ?? 'F',
-        'APPLIEDSTOCK' => $camposLibres['APPLIEDSTOCK'] ?? 'T',
-        'MARCA' => $apiProduct['Marca'] ?? '',
-        'Departamento' => $apiProduct['Departamento'] ?? '',
-        'Seccion' => $apiProduct['Seccion'] ?? '',
-        'NIVEL1' => $camposLibres['NIVEL1'] ?? null,
-        'NIVEL2' => $camposLibres['NIVEL2'] ?? null,
-        'NIVEL3' => $camposLibres['NIVEL3'] ?? null,
-        'NIVEL4' => $camposLibres['NIVEL4'] ?? null,
-        'Stocks' => $apiProduct['Stocks'] ?? [],
-    ];
-}
+        $camposLibres = $apiProduct['Camposlibres'][0] ?? [];
+
+        return [
+            'ARTCOD' => $sku,
+            'ARTDES' => $apiProduct['Descripcion'] ?? '',
+            'ARTOBSERV' => $apiProduct['Descripcion'] ?? '',
+            'PVPTARIF' => $price,
+            'PVPOFER' => $specialPrice,
+            'PVPOFER_DESDE' => $specialFromDate,
+            'PVPOFER_HASTA' => $specialToDate,
+            'EXISTEN' => $totalStock,
+            'PESO' => 0,
+            'ARTEAN' => $apiProduct['TallasColores'][0]['CodigoBarras1'] ?? '',
+            'Familia' => $apiProduct['Familia'] ?? '',
+            'Subfamilia' => $apiProduct['SubFamilia'] ?? '',
+            'WEBVISB' => $camposLibres['WEBVISB'] ?? 'F',
+            'APPLIEDSTOCK' => $camposLibres['APPLIEDSTOCK'] ?? 'T',
+            'MARCA' => $apiProduct['Marca'] ?? '',
+            'Departamento' => $apiProduct['Departamento'] ?? '',
+            'Seccion' => $apiProduct['Seccion'] ?? '',
+            'NIVEL1' => $camposLibres['NIVEL1'] ?? null,
+            'NIVEL2' => $camposLibres['NIVEL2'] ?? null,
+            'NIVEL3' => $camposLibres['NIVEL3'] ?? null,
+            'NIVEL4' => $camposLibres['NIVEL4'] ?? null,
+            'Stocks' => $apiProduct['Stocks'] ?? [],
+        ];
+    }
 
     /**
      * Obtener múltiples productos por array de SKUs
@@ -255,7 +257,7 @@ class IcgApiService
 
         foreach ($skus as $sku) {
             $result = $this->getProductBySku($sku);
-            
+
             if ($result['success']) {
                 $products[] = $result['data'];
             } else {
@@ -279,11 +281,11 @@ class IcgApiService
     {
         try {
             $result = $this->getProducts(1, 1);
-            
+
             return [
                 'success' => $result['success'],
-                'message' => $result['success'] 
-                    ? 'Connection successful' 
+                'message' => $result['success']
+                    ? 'Connection successful'
                     : 'Connection failed: ' . ($result['error'] ?? 'Unknown error'),
                 'response_data' => $result
             ];
@@ -319,6 +321,45 @@ class IcgApiService
                 'success' => false,
                 'error' => $e->getMessage()
             ];
+        }
+    }
+
+    /**
+     * Busca un artículo por su ID interno (ArticuloId).
+     */
+    public function getProductById($id)
+    {
+        try {
+            // Asumimos que el parámetro para buscar por ID es 'id' o 'ArticuloId'.
+            // Probamos enviar ambos por si acaso.
+            $params = [
+                'id' => $id,
+                'ArticuloId' => $id
+            ];
+
+            $response = Http::withBasicAuth($this->username, $this->password)
+                ->timeout(5) // Timeout corto para ser ágiles
+                ->get($this->baseUrl, $params);
+
+            if (!$response->successful()) {
+                return ['success' => false, 'error' => 'HTTP ' . $response->status()];
+            }
+
+            $data = $response->json();
+            $products = $data['products'] ?? [];
+
+            if (empty($products)) {
+                return ['success' => false, 'error' => 'Not found'];
+            }
+
+            // Devolver el primer producto encontrado
+            return [
+                'success' => true,
+                'data' => $products[0]
+            ];
+
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 }
