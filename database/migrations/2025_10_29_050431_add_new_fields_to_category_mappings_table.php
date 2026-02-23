@@ -82,7 +82,7 @@ return new class extends Migration
 
     private function indexExists($table, $indexName)
     {
-        $indexes = DB::select("SHOW INDEXES FROM {$table} WHERE Key_name = ?", [$indexName]);
+        $indexes = DB::select("SELECT indexname FROM pg_indexes WHERE tablename = '{$table}' AND indexname = ?", [$indexName]);
         return !empty($indexes);
     }
 };

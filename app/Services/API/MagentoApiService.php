@@ -13,10 +13,10 @@ class MagentoApiService
     protected $storeId;
     protected $timeout = 60;
 
-    public function __construct()
+ public function __construct()
     {
         $config = SyncConfiguration::getMagentoApiConfig();
-        
+
         $this->baseUrl = rtrim($config['base_url'], '/');
         $this->token = $config['api_token'];
         $this->storeId = $config['store_id'];

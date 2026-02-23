@@ -210,32 +210,30 @@ class SyncConfiguration extends Model
         ]);
     }
 
-    /**
-     * Obtener todas las configuraciones de API ICG
-     */
-    public static function getIcgApiConfig()
-    {
-        return [
-            'url' => self::get('icg_api_url'),
-            'user' => self::get('icg_api_user'),
-            'password' => self::get('icg_api_password'),
-        ];
-    }
+/**
+ * Obtener configuraciones de API ICG
+ */
+public static function getIcgApiConfig()
+{
+    return [
+        'url'      => env('ICG_API_URL', self::where('key', 'icg_api_url')->value('value')),
+        'user'     => env('ICG_API_USER', self::where('key', 'icg_api_user')->value('value')),
+        'password' => env('ICG_API_PASSWORD', self::where('key', 'icg_api_password')->value('value')),
+    ];
+}
 
-    /**
+/**
      * Obtener todas las configuraciones de API Magento
      */
     public static function getMagentoApiConfig()
     {
         return [
-            'base_url' => self::get('magento_base_url'),
-            'api_token' => self::get('magento_api_token'),
-            'store_id' => self::get('magento_store_id', 1),
-            'batch_size' => self::get('magento_batch_size', 50),
+            'base_url'  => env('MAGENTO_BASE_URL', self::where('key', 'magento_base_url')->value('value')),
+            'api_token' => env('MAGENTO_API_TOKEN', self::where('key', 'magento_api_token')->value('value')),
+            'store_id'  => env('MAGENTO_STORE_ID', self::where('key', 'magento_store_id')->value('value') ?? 1),
         ];
     }
-
-    /**
+ /**
      * Obtener todas las configuraciones de FTP
      */
     public static function getFtpConfig()
